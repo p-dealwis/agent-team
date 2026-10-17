@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "agent-team",
+  "description": "Run a task with a small team of subagents: the main session plans and coordinates, an explorer reads code, a worker edits and runs tests, a researcher finds docs, and a tester writes the acceptance tests first and verifies the work against them. Survives usage limits with a handover file and a resume watchdog.",
+  "author": {
+    "name": "p-dealwis"
+  },
+  "homepage": "https://github.com/p-dealwis/agent-team",
+  "repository": "https://github.com/p-dealwis/agent-team",
+  "keywords": ["subagents", "orchestration", "test-first", "coordination"]
+}

@@ -24,10 +24,14 @@ Invoked as `/agent-team resume [handover path]`: skip planning and follow
 
 | Need | Delegate to | Never |
 | --- | --- | --- |
-| Find where something lives, how it works, what a change touches | `explorer` subagent | edits |
-| Make a scoped change and run its tests | `worker` subagent | widen scope, commit, push, edit the tester's tests |
-| Authoritative docs, API references, specs, changelogs | `researcher` subagent | edit code |
-| Turn the goals into tests that must pass (before the work); verify the work against them (after) | `tester` subagent (Opus, `xhigh`) | edit production code, weaken a test to make it pass |
+| Find where something lives, how it works, what a change touches | `agent-team:explorer` | edits |
+| Make a scoped change and run its tests | `agent-team:worker` | widen scope, commit, push, edit the tester's tests |
+| Authoritative docs, API references, specs, changelogs | `agent-team:researcher` | edit code |
+| Turn the goals into tests that must pass (before the work); verify the work against them (after) | `agent-team:tester` (Opus, `xhigh`) | edit production code, weaken a test to make it pass |
+
+The four subagents come with this plugin, so their names carry its prefix: pass
+`agent-team:explorer` and so on as the subagent type. The rest of this file calls them
+the explorer, worker, researcher and tester.
 
 Give each subagent one job with exact inputs: files, expected behaviour, test
 command, or the question to answer. Run independent jobs in parallel. Do not
@@ -115,7 +119,7 @@ reached (for example "usage limit reached … resets 3pm (Australia/Sydney)", or
 
 1. Mark the job interrupted in the handover file, with the message.
 2. Get the resume time:
-   `python3 ~/.claude/skills/agent-team/scripts/reset-time.py "<the message>"`
+   `python3 "${CLAUDE_SKILL_DIR}/scripts/reset-time.py" "<the message>"`
    prints `RESET_AT`, `RESUME_AT`, `CRON` (local time, 3 minutes past the reset) and
    `WAIT_MINUTES`. Exit 2 means it found no time: rely on the watchdog.
 3. Call `CronCreate` with that `CRON`, `recurring: false`, and the watchdog's prompt.
