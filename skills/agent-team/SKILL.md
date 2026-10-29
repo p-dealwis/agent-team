@@ -1,6 +1,6 @@
 ---
 name: agent-team
-description: Run a task with the agent-team setup - the main session plans and coordinates on high effort, delegates code reading to the explorer subagent, edits and tests to the worker subagent, doc lookups to the researcher subagent, and the task's acceptance tests to the tester subagent (Opus, xhigh), which writes them before the work and verifies the work against them after, and consults the advisor at fixed checkpoints. It survives usage limits: it keeps a handover file, arms a watchdog, and resumes the run itself after the limit resets. Use when the user says "agent-team", "/agent-team", or asks for something to be done "by the agent team", or to resume an agent-team run from its handover file.
+description: Run a task with the agent-team setup - the main session plans and coordinates on high effort, delegates code reading to the explorer subagent, edits and tests to the worker subagent, doc lookups to the researcher subagent, and the task's acceptance tests to the tester subagent (Opus, xhigh), which writes them while the workers build in parallel and verifies the work against them after, and consults the advisor at fixed checkpoints. It survives usage limits: it keeps a handover file, arms a watchdog, and resumes the run itself after the limit resets. Use when the user says "agent-team", "/agent-team", or asks for something to be done "by the agent team", or to resume an agent-team run from its handover file.
 ---
 
 # agent-team
@@ -27,7 +27,7 @@ Invoked as `/agent-team resume [handover path]`: skip planning and follow
 | Find where something lives, how it works, what a change touches | `agent-team:explorer` | edits |
 | Make a scoped change and run its tests | `agent-team:worker` | widen scope, commit, push, edit the tester's tests |
 | Authoritative docs, API references, specs, changelogs | `agent-team:researcher` | edit code |
-| Turn the goals into tests that must pass (before the work); verify the work against them (after) | `agent-team:tester` (Opus, `xhigh`) | edit production code, weaken a test to make it pass |
+| Turn the goals into tests that must pass (while the workers build); verify the work against them (after) | `agent-team:tester` (Opus, `xhigh`) | edit production code, weaken a test to make it pass |
 
 The four subagents come with this plugin, so their names carry its prefix: pass
 `agent-team:explorer` and so on as the subagent type. The rest of this file calls them
@@ -42,21 +42,37 @@ redo a job you delegated; wait for its report.
 Use it for any task that changes code and has goals a test can check. Skip it for
 docs-only, research, or config with no testable behaviour, and say why.
 
-1. **Write.** After the plan (and advisor checkpoint 1 if it applies), run the
-   `tester` in write mode with the goals, acceptance criteria and the interfaces or
-   spec, not an implementation. It returns a goal → test table and red output.
-   Check each test fails for the right reason and that together they cover the goals.
-   **These tests are the contract.**
-2. **Build.** Give the `worker` the task, the test command and the test files, marked
-   read-only. The worker makes them pass (plus its own tests) and reports. If it thinks
-   a test is wrong, it says so instead of changing it.
-3. **Verify.** Run the `tester` in verify mode. It reruns everything, checks the test
+1. **Pin the interfaces.** After the plan (and advisor checkpoint 1 if it applies),
+   write down what the tests and the code must agree on: names, signatures, schemas,
+   routes, the exact UI copy, and any shared test fixture's contract. This is what
+   lets the next step run in parallel and still meet.
+2. **Write and build at the same time.** Always start the workers and the tester
+   together, in one message. Don't wait for the tests before building.
+   - **Tester:** write mode, with the goals, the acceptance criteria and the pinned
+     interfaces, not an implementation. It returns a goal → test table and red output.
+     Check each test fails for the right reason (or already passes because a worker
+     landed that behaviour, and isn't a tautology) and that together they cover the
+     goals. **These tests are the contract.**
+   - **Workers:** split the build by area so no two workers edit the same files (for
+     example database, backend and UI), and start every independent one now. Give each
+     its slice of the interfaces, and name the test files and folders the tester owns
+     as off-limits. Give every shared resource one owner: database resets, stack
+     restarts, a dev-server port, a lockfile. The others leave it alone, and a change
+     that needs a restart waits for one restart you schedule. A slice that depends on
+     another starts anyway against the pinned interfaces.
+   - **When the tester reports:** snapshot the test files for the tamper check, then
+     send the test command and the files, marked read-only, to each worker that owns
+     the code they cover (continue it with `SendMessage`). The worker makes them pass
+     (plus its own tests, in separate files) and reports. If it thinks a test is wrong,
+     it says so instead of changing it.
+3. **Verify.** When every worker has reported, run the `tester` in verify mode. It reruns everything, checks the test
    files weren't weakened (a tamper check), checks the goals are still covered, and
    diagnoses each failure: code wrong, test wrong, or goal ambiguous.
 4. **Resolve.** Subagents can't message each other or call the advisor, so you
    mediate:
-   - **Code wrong:** send the tester's diagnosis to the worker (continue it with
-     `SendMessage`), then verify again.
+   - **Code wrong:** send the tester's diagnosis to the worker that owns that code
+     (continue it with `SendMessage`), then verify again. Fixes in different areas run
+     in parallel.
    - **Test wrong**, or the worker disputes a test: put both positions to the advisor
      (checkpoint 4) and decide. If the test changes, the tester makes the change, and
      you record why.
@@ -65,6 +81,9 @@ docs-only, research, or config with no testable behaviour, and say why.
      the user.
 5. **Done.** Only when the agreed tests pass in verify mode, with a clean tamper check,
    or when the user accepts a documented exception.
+
+Without the test-first loop (docs, research, config), workers still start together
+whenever their jobs are independent.
 
 The tester runs on Opus at `xhigh`, which is expensive. Use it for the write and
 verify steps only. Routine test runs during the build are the worker's.

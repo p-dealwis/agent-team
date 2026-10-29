@@ -2,8 +2,9 @@
 
 A Claude Code skill that runs a task with a small team of subagents. The main session plans and coordinates.
 It hands code reading to `explorer`, edits and test runs to `worker`, doc lookups to `researcher`, and the
-task's acceptance tests to `tester`. The tester writes those tests before the work starts and verifies the
-work against them afterwards. The coordinator consults the advisor at fixed checkpoints.
+task's acceptance tests to `tester`. Once the interfaces are pinned, the tester writes those tests while the
+workers build in parallel, split by area, and afterwards it verifies the work against them. The coordinator
+consults the advisor at fixed checkpoints.
 
 The run survives usage limits. It keeps a handover file and arms a watchdog cron. When the limit resets,
 it resumes the run itself.
@@ -21,7 +22,7 @@ It is a Claude Code plugin, and the repo is also its own one-plugin marketplace.
 | `agents/explorer.md` | Read-only code explorer (Opus, medium effort) |
 | `agents/worker.md` | Makes one scoped change and runs its tests (Opus, medium effort) |
 | `agents/researcher.md` | Finds and summarises authoritative docs (Opus, medium effort) |
-| `agents/tester.md` | Writes the acceptance tests first, then verifies the work against them (Opus, xhigh effort) |
+| `agents/tester.md` | Writes the acceptance tests while the workers build, then verifies the work against them (Opus, xhigh effort) |
 
 Inside a session the subagents are named `agent-team:explorer`, `agent-team:worker`,
 `agent-team:researcher` and `agent-team:tester`.
